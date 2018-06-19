@@ -641,3 +641,65 @@ For future work, I'd like to change how I score word frequencies when they appea
 Additionally, I'd like to add more of his albums and see how the data changes. Specifically, it'd be interesting to see 
 how many words get added to the distinct words list, and also which ones currently on, end up getting 
 removed when adding more lyrics.
+
+## Cumulative Unique Word Total Over Time
+The last thing I wanted to see was the growth in unique word count over time. 
+To do this, I needed to find each new word used while looking through the text of each song,
+chronologically by album.  
+```angular2html
+
+def cumulative_unique_words():
+    words_contributed_by_song = {} #key = (album name, song name) value = number of new words
+    word_count = [] #grand list of all words never seen before
+    for a, album in enumerate(all_albums):
+
+        for song in album:
+            song_name = song.name.split('/')[2].split('.txt')[0]
+            song.seek(0)
+
+            for line in song:
+                line = line.split('\n')[0]
+                line = line.split(" ")
+                for word in line:
+                    if word not in word_count:
+                        word_count.append(word)
+            words_contributed_by_song[(album_name_map(a), song_name)] = len(word_count)
+    return words_contributed_by_song
+
+
+def unique_words_per_song_cumulative():
+    cumulative_word_frequency = cumulative_unique_words()
+
+    x_pos = 0
+    x = []
+    y = []
+    percent_changes = []
+    album_break_points = []
+    first = "Bazooka Tooth"
+    pos = 0
+    for k, v in sorted(cumulative_word_frequency.iteritems(), key=lambda k: cumulative_word_frequency[k[0]]):
+        x.append(x_pos)
+        y.append(v)
+        # need to know where the albums change for color reference on plot
+        if k[0] != first:
+            album_break_points.append(x_pos)
+            first = k[0]
+        #also want to look at a plot of the percent change in total unique words
+        percent_changes.append(100*(y[pos]-y[pos-1])/y[pos-1])
+        pos+=1
+
+        x_pos += 1
+```
+![alttext](Cumulative.png)
+
+We can see the growth of his vocabulary with the progression of his career. 
+Although I wonder if the plateau-ing isn't just due to the fact that it would
+get increasingly harder to add new words to his music after already putting out so many lyrics.
+I'd like to do this same graph but reverse the order that I collect new words in and see if there is the same effect.  
+Taking a look at the percent change...
+![alttext](Percent_change.png)
+we can see clearer dips and spikes and can more clearly tell which particular songs 
+had what type of effect on the number of unique words used.  
+If I keep working on this project, just as a note to myself, I need to fix 
+how words in the chorus are counted. I think that's having a large impact on my data,
+not necessarily for the worse, but I'd like to see what happens if I change that.

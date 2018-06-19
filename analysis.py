@@ -6,11 +6,13 @@ import numpy as np
 
 # Album list to store song files
 from collections import Counter
+from math import log
 
 FCDFK = []
 IK = []
 NSP = []
 Skel = []
+BT = []
 
 for dir in glob.glob('lyrics/*'):
     dir = dir.split("lyrics/")[1]
@@ -22,7 +24,9 @@ for dir in glob.glob('lyrics/*'):
         if dir == "None_Shall_Pass":
             NSP.append((open(song, 'r')))
         if dir == "Skelethon":
-            Skel.append((open(song,'r')))
+            Skel.append((open(song, 'r')))
+        if dir == "Bazooka_Tooth":
+            BT.append((open(song, 'r')))
 
 '''
 Clean up text. Want the text to be all one case so "Word" isn't counted differently than "word"
@@ -41,7 +45,11 @@ def strip_text(albums):
             current_dir = "None_Shall_Pass"
         if album == Skel:
             current_dir = "Skelethon"
+        if album == BT:
+            current_dir = "Bazooka_Tooth"
+
         for song in album:
+
             # create new file '<song_name>_cleaned.txt' to hold new, stripped lyrics
             with open(str(song.name.split('.txt')[0] + '_cleaned.txt'), 'w') as f:
                 for line in song:
@@ -57,8 +65,7 @@ def strip_text(albums):
                       str(song.name.split('.txt')[0].split(current_dir + "/")[1]) + "_cleaned.txt " + str(song.name))
 
 
-all_albums = [IK, FCDFK, NSP, Skel]
-
+all_albums = [BT, FCDFK, NSP, Skel, IK]
 
 strip_text(all_albums)
 
@@ -130,51 +137,57 @@ def plot_album_bars(list_name, album_name, fig_n):
     return words, counts
 
 
-plot_album_bars(IK, "Impossible_Kid", 1)
-plot_album_bars(FCDFK, "Fast_Cars_Danger_Fire_and_Knives", 2)
-plot_album_bars(NSP, "None_Shall_Pass", 3)
-plot_album_bars(Skel, "Skelethon", 3)
+# plot_album_bars(IK, "Impossible_Kid", 1)
+# plot_album_bars(FCDFK, "Fast_Cars_Danger_Fire_and_Knives", 2)
+# plot_album_bars(NSP, "None_Shall_Pass", 3)
+# plot_album_bars(Skel, "Skelethon", 3)
+# plot_album_bars(BT, "Bazooka_Tooth", 5)
+# all_albums = [IK, FCDFK, NSP, Skel, BT]
+
+def album_name_map(index):
+    if index == 0:
+        return "Bazooka Tooth"
+    elif index == 1:
+        return "Fast Cars Danger Fire and Knives"
+    elif index == 2:
+        return "None Shall Pass"
+    elif index == 3:
+        return "Skelethon"
+    elif index == 4:
+        return "The Impossible Kid"
 
 
 def all_unique_words():
     check = []
-    for album in all_albums:
+    for a, album in enumerate(all_albums):
         songs, names = word_frequency(album)
-
         words = []
         counts = []
         song = []
         for i, dictionary in enumerate(songs):
             for k in sorted(dictionary, key=lambda x: dictionary[x]):
+                print i, names[i], k, dictionary[k]
                 song.append(names[i])
                 words.append(k)
                 counts.append(dictionary[k])
 
         pairs = []
         for s, w, c in zip(song, words, counts):
-            pairs.append((s, w, c))
+            pairs.append((s, w, c, album_name_map(a)))
 
         for pair in reversed(sorted(set(pairs), key=lambda x: x[2])):
             if pair[1] not in [x[1] for x in check]:
                 check.append(pair)
 
-    unique_words_per_song = [(i[0],i[1]) for i in check if i[2] == 1]
-    unique_words = [i[1] for i in check if i[2] == 1]
+    unique_words_per_song = [(i[0], i[1], i[3]) for i in check if i[2] == 1]
+    unique_words = [(i[1], i[3]) for i in check if i[2] == 1]
     return unique_words, len(unique_words), unique_words_per_song
 
 
-def save_all_unique_words():
-    unique_words = all_unique_words()[0]
-
-    with open("All_Unique_Words.txt",'w') as f:
-        for word in reversed(sorted(unique_words, key = lambda x:len(x))):
-            f.write(word+"\n")
-
-
-def songs_unique_words():
-    unique_word_song_pars = all_unique_words()[2]
-    songs_word_count = Counter([name[0] for name in unique_word_song_pars])
-    songs_word_count = [x for x in reversed(sorted(songs_word_count.iteritems(), key = lambda x:songs_word_count[x[0]]))]
+def unique_words_per_song_bar_plot():
+    unique_word_song_pairs = all_unique_words()[2]
+    songs_word_count = Counter([(name[0], name[2]) for name in unique_word_song_pairs])
+    songs_word_count = [x for x in reversed(sorted(songs_word_count.iteritems(), key=lambda x: songs_word_count[x[0]]))]
     plt.xlabel('Song')
     plt.ylabel('Number of Unique Words')
     plt.title("Number of Unique Words per Song")
@@ -185,7 +198,75 @@ def songs_unique_words():
     plt.xticks(indexes + width * .5, [x[0] for x in songs_word_count], rotation=80)
     # plt.legend()
     plt.tight_layout()
-    #plt.show()
+    plt.show()
 
 
-songs_unique_words()
+def cumulative_unique_words():
+    words_contributed_by_song = {}
+    word_count = []
+    for a, album in enumerate(all_albums):
+
+        for song in album:
+            song_name = song.name.split('/')[2].split('.txt')[0]
+            song.seek(0)
+
+            for line in song:
+                line = line.split('\n')[0]
+                line = line.split(" ")
+                for word in line:
+                    if word not in word_count:
+                        word_count.append(word)
+            words_contributed_by_song[(album_name_map(a), song_name)] = len(word_count)
+    return words_contributed_by_song
+
+
+def unique_words_per_song_cumulative():
+    cumulative_word_frequency = cumulative_unique_words()
+
+    x_pos = 0
+    x = []
+    y = []
+    percent_changes = []
+    album_break_points = []
+    first = "Bazooka Tooth"
+    pos = 0
+    for k, v in sorted(cumulative_word_frequency.iteritems(), key=lambda k: cumulative_word_frequency[k[0]]):
+        x.append(x_pos)
+        y.append(v)
+        if k[0] != first:
+            album_break_points.append(x_pos)
+            first = k[0]
+
+        percent_changes.append(100*(y[pos]-y[pos-1])/y[pos-1])
+        pos+=1
+
+        x_pos += 1
+
+    z = np.polyfit(x, y, 2, full = True)
+    p = np.poly1d(z[0])
+    plt.figure(figsize=(10, 12))
+    plt.xticks([i for i in range(0, x_pos)], [k[0][1] for k in sorted(cumulative_word_frequency.iteritems(),
+                                                                      key=lambda k: cumulative_word_frequency[k[0]])],
+               rotation=80)
+    # plt.plot(x,p(x),'k')
+    plt.plot(x[0:album_break_points[0]], percent_changes[0:album_break_points[0]], 'r', label="Bazooka Tooth")
+    plt.plot(x[album_break_points[0]:album_break_points[1]],
+             percent_changes[album_break_points[0]:album_break_points[1]], 'b',
+             label="Fast Cars Danger Fire and Knives")
+    plt.plot(x[album_break_points[1]:album_break_points[2]],
+             percent_changes[album_break_points[1]:album_break_points[2]], 'y',
+             label="None Shall Pass")
+    plt.plot(x[album_break_points[2]:album_break_points[3]],
+             percent_changes[album_break_points[2]:album_break_points[3]], 'm',
+             label="Skelethon")
+    plt.plot(x[album_break_points[3]:], percent_changes[album_break_points[3]:], 'c', label="The Impossible Kid")
+    plt.xlabel('Songs, listed chronologically by album')
+    plt.ylabel('Percent Change')
+    plt.title("Percent Change to Total Number of Unique Words")
+
+    plt.legend(loc='upper center')
+    plt.tight_layout()
+    plt.show()
+
+
+unique_words_per_song_cumulative()
